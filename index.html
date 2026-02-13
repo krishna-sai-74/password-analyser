@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Sentinel V3 | Live Color Sync</title>
+    <title>Password Analyser | Sentinel V3</title>
     <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&family=Inter:wght@300;400;600&display=swap" rel="stylesheet">
     <style>
         :root {
@@ -69,7 +69,7 @@
         }
 
         .header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 30px; }
-        .logo { font-family: 'JetBrains Mono'; font-weight: 700; font-size: 1.3rem; }
+        .logo { font-family: 'JetBrains Mono'; font-weight: 700; font-size: 1.1rem; text-transform: uppercase; letter-spacing: 1px; }
         .logo span { color: var(--primary); }
 
         .theme-toggle {
@@ -133,19 +133,19 @@
 
     <div class="card">
         <div class="header">
-            <div class="logo">SENTINEL <span>V3</span></div>
+            <div class="logo">Password <span>Analyser</span></div>
             <button class="theme-toggle" onclick="toggleTheme()">🌓 MODE</button>
         </div>
 
         <div class="input-group">
-            <input type="password" id="password" placeholder="Analyze security..." oninput="analyze()">
+            <input type="password" id="password" placeholder="Analyse phrase..." oninput="analyze()">
             <div id="scan-bar" class="scan-bar"></div>
         </div>
 
         <div class="dashboard">
             <span style="font-size: 10px; text-transform: uppercase; letter-spacing: 2px; opacity: 0.6;">Est. Crack Time</span>
             <span id="time-val" class="time-val">0.00s</span>
-            <span id="risk-level" style="font-size: 12px; font-weight: 700;">INITIALIZING...</span>
+            <span id="risk-level" style="font-size: 12px; font-weight: 700;">READY</span>
             
             <div class="meter">
                 <div class="segment"></div>
@@ -196,7 +196,7 @@
         update() {
             this.x += this.vx;
             this.y += this.vy;
-            this.color = currentAccent; // LIVE COLOR SYNC
+            this.color = currentAccent;
 
             let speed = Math.sqrt(this.vx**2 + this.vy**2);
             if (speed > this.minSpeed) {
@@ -256,10 +256,10 @@
         if (pwd.length >= 12) score++; else if (pwd.length < 8) score = Math.max(0, score - 1);
 
         const colors = ['#ff4d4d', '#ff4d4d', '#ffaa00', '#00f2ff', '#00ffb3'];
-        const levels = ['CRITICAL THREAT', 'WEAK SYSTEM', 'MODERATE', 'STRONG SHIELD', 'UNBREAKABLE'];
+        const levels = ['CRITICAL', 'WEAK', 'MODERATE', 'STRONG', 'SECURE'];
         
         const activeColor = colors[score - 1] || colors[0];
-        currentAccent = activeColor; // Changes the GLOBAL accent for dots
+        currentAccent = activeColor;
 
         segments.forEach((s, i) => {
             s.style.background = i < score ? activeColor : 'var(--border)';
@@ -302,7 +302,7 @@
         document.querySelectorAll('.segment').forEach(s => { s.style.background = 'var(--border)'; s.style.boxShadow = 'none'; });
         document.getElementById('time-val').innerText = "0.00s";
         document.getElementById('time-val').style.color = 'var(--primary)';
-        document.getElementById('risk-level').innerText = "READY TO SCAN";
+        document.getElementById('risk-level').innerText = "READY";
         document.getElementById('risk-level').style.color = 'var(--text)';
         document.getElementById('scan-bar').style.width = "0%";
         document.getElementById('tips-container').classList.add('hidden');
