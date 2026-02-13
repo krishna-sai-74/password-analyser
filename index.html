@@ -1,0 +1,313 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sentinel V3 | Live Color Sync</title>
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&family=Inter:wght@300;400;600&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg: #05070a;
+            --card: rgba(13, 17, 23, 0.7);
+            --primary: #00f2ff;
+            --danger: #ff4d4d;
+            --warning: #ffaa00;
+            --success: #00ffb3;
+            --text: #e6edf3;
+            --border: rgba(255, 255, 255, 0.1);
+            --grid: rgba(0, 242, 255, 0.05);
+        }
+
+        .light-mode {
+            --bg: #f0f2f5;
+            --card: rgba(255, 255, 255, 0.85);
+            --primary: #0070f3;
+            --danger: #e00;
+            --warning: #f5a623;
+            --success: #00703c;
+            --text: #111;
+            --border: rgba(0, 0, 0, 0.1);
+            --grid: rgba(0, 112, 243, 0.05);
+        }
+
+        * { box-sizing: border-box; transition: background 0.4s, color 0.4s; }
+
+        body {
+            margin: 0;
+            background: var(--bg);
+            color: var(--text);
+            font-family: 'Inter', sans-serif;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            overflow: hidden;
+            position: relative;
+        }
+
+        #bg-canvas { position: absolute; top: 0; left: 0; z-index: -1; pointer-events: none; }
+
+        .grid-overlay {
+            position: absolute;
+            inset: 0;
+            background-image: linear-gradient(var(--grid) 1px, transparent 1px), 
+                              linear-gradient(90deg, var(--grid) 1px, transparent 1px);
+            background-size: 40px 40px;
+            z-index: -1;
+            pointer-events: none;
+        }
+
+        .card {
+            width: 480px;
+            background: var(--card);
+            backdrop-filter: blur(25px);
+            border: 1px solid var(--border);
+            border-radius: 32px;
+            padding: 40px;
+            box-shadow: 0 30px 60px rgba(0,0,0,0.4);
+            z-index: 10;
+        }
+
+        .header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 30px; }
+        .logo { font-family: 'JetBrains Mono'; font-weight: 700; font-size: 1.3rem; }
+        .logo span { color: var(--primary); }
+
+        .theme-toggle {
+            background: var(--border);
+            border: none;
+            color: var(--text);
+            padding: 8px 14px;
+            border-radius: 12px;
+            cursor: pointer;
+            font-size: 11px;
+            font-weight: 700;
+        }
+
+        .input-group { position: relative; margin-bottom: 30px; }
+        input {
+            width: 100%;
+            padding: 20px;
+            background: rgba(0,0,0,0.15);
+            border: 1px solid var(--border);
+            border-radius: 16px;
+            color: var(--text);
+            font-family: 'JetBrains Mono';
+            outline: none;
+        }
+
+        .scan-bar {
+            position: absolute;
+            bottom: 0; left: 0; height: 3px;
+            width: 0%; background: var(--primary);
+            box-shadow: 0 0 15px var(--primary);
+            transition: width 0.4s, background 0.4s;
+        }
+
+        .dashboard {
+            background: rgba(0,0,0,0.08);
+            border-radius: 24px;
+            padding: 25px;
+            margin-bottom: 25px;
+            text-align: center;
+        }
+
+        .time-val {
+            display: block;
+            font-family: 'JetBrains Mono';
+            font-size: 1.8rem;
+            font-weight: 700;
+            margin: 10px 0;
+        }
+
+        .meter { display: flex; gap: 8px; margin-top: 15px; }
+        .segment { height: 6px; flex: 1; background: var(--border); border-radius: 10px; transition: 0.3s; }
+
+        #tips-container { border-top: 1px solid var(--border); padding-top: 20px; font-size: 13px; }
+        .hidden { display: none; }
+    </style>
+</head>
+<body>
+
+    <canvas id="bg-canvas"></canvas>
+    <div class="grid-overlay"></div>
+
+    <div class="card">
+        <div class="header">
+            <div class="logo">SENTINEL <span>V3</span></div>
+            <button class="theme-toggle" onclick="toggleTheme()">🌓 MODE</button>
+        </div>
+
+        <div class="input-group">
+            <input type="password" id="password" placeholder="Analyze security..." oninput="analyze()">
+            <div id="scan-bar" class="scan-bar"></div>
+        </div>
+
+        <div class="dashboard">
+            <span style="font-size: 10px; text-transform: uppercase; letter-spacing: 2px; opacity: 0.6;">Est. Crack Time</span>
+            <span id="time-val" class="time-val">0.00s</span>
+            <span id="risk-level" style="font-size: 12px; font-weight: 700;">INITIALIZING...</span>
+            
+            <div class="meter">
+                <div class="segment"></div>
+                <div class="segment"></div>
+                <div class="segment"></div>
+                <div class="segment"></div>
+                <div class="segment"></div>
+            </div>
+        </div>
+
+        <div id="tips-container" class="hidden">
+            <ul id="tips-list" style="margin: 0; padding-left: 20px; opacity: 0.8;"></ul>
+        </div>
+    </div>
+
+<script>
+    const canvas = document.getElementById('bg-canvas');
+    const ctx = canvas.getContext('2d');
+    let particles = [];
+    let currentAccent = '#00f2ff';
+
+    function initCanvas() {
+        canvas.width = window.innerWidth;
+        canvas.height = window.innerHeight;
+    }
+
+    class Particle {
+        constructor(x, y, isBurst = false) {
+            this.reset(x, y, isBurst);
+        }
+
+        reset(x, y, isBurst) {
+            this.x = x || Math.random() * canvas.width;
+            this.y = y || Math.random() * canvas.height;
+            this.size = Math.random() * 2 + 1;
+            this.color = currentAccent;
+            
+            if (isBurst) {
+                this.vx = (Math.random() - 0.5) * 18; 
+                this.vy = (Math.random() - 0.5) * 18;
+            } else {
+                this.vx = (Math.random() - 0.5) * 1.5;
+                this.vy = (Math.random() - 0.5) * 1.5;
+            }
+            this.minSpeed = 0.4 + Math.random() * 0.6;
+        }
+
+        update() {
+            this.x += this.vx;
+            this.y += this.vy;
+            this.color = currentAccent; // LIVE COLOR SYNC
+
+            let speed = Math.sqrt(this.vx**2 + this.vy**2);
+            if (speed > this.minSpeed) {
+                this.vx *= 0.96;
+                this.vy *= 0.96;
+            }
+
+            if (this.x > canvas.width) this.x = 0;
+            if (this.x < 0) this.x = canvas.width;
+            if (this.y > canvas.height) this.y = 0;
+            if (this.y < 0) this.y = canvas.height;
+        }
+
+        draw() {
+            ctx.fillStyle = this.color;
+            ctx.globalAlpha = 0.4;
+            ctx.beginPath();
+            ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2);
+            ctx.fill();
+        }
+    }
+
+    window.addEventListener('mousedown', (e) => {
+        for (let i = 0; i < 40; i++) {
+            particles.push(new Particle(e.clientX, e.clientY, true));
+        }
+        if (particles.length > 300) particles.splice(0, 40);
+    });
+
+    function animate() {
+        const bg = getComputedStyle(document.body).getPropertyValue('--bg');
+        ctx.fillStyle = bg;
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        particles.forEach(p => { p.update(); p.draw(); });
+        requestAnimationFrame(animate);
+    }
+
+    initCanvas();
+    for(let i=0; i<85; i++) particles.push(new Particle());
+    animate();
+    window.addEventListener('resize', initCanvas);
+
+    function analyze() {
+        const pwd = document.getElementById('password').value;
+        const segments = document.querySelectorAll('.segment');
+        const timeVal = document.getElementById('time-val');
+        const riskLabel = document.getElementById('risk-level');
+        const scanBar = document.getElementById('scan-bar');
+        
+        if (!pwd) { resetUI(); return; }
+
+        let score = 0, charset = 0, tips = [];
+        if (/[a-z]/.test(pwd)) { score++; charset += 26; } else tips.push("Lowercase needed");
+        if (/[A-Z]/.test(pwd)) { score++; charset += 26; } else tips.push("Uppercase needed");
+        if (/[0-9]/.test(pwd)) { score++; charset += 10; } else tips.push("Numbers needed");
+        if (/[^A-Za-z0-9]/.test(pwd)) { score++; charset += 32; } else tips.push("Symbols needed");
+        if (pwd.length >= 12) score++; else if (pwd.length < 8) score = Math.max(0, score - 1);
+
+        const colors = ['#ff4d4d', '#ff4d4d', '#ffaa00', '#00f2ff', '#00ffb3'];
+        const levels = ['CRITICAL THREAT', 'WEAK SYSTEM', 'MODERATE', 'STRONG SHIELD', 'UNBREAKABLE'];
+        
+        const activeColor = colors[score - 1] || colors[0];
+        currentAccent = activeColor; // Changes the GLOBAL accent for dots
+
+        segments.forEach((s, i) => {
+            s.style.background = i < score ? activeColor : 'var(--border)';
+            s.style.boxShadow = i < score ? `0 0 12px ${activeColor}` : 'none';
+        });
+
+        scanBar.style.width = Math.min(100, (pwd.length * 8)) + "%";
+        scanBar.style.background = activeColor;
+        riskLabel.innerText = levels[score - 1] || 'SCANNING...';
+        riskLabel.style.color = activeColor;
+
+        const seconds = Math.pow(charset || 1, pwd.length) / 1e10;
+        timeVal.innerText = formatTime(seconds);
+        timeVal.style.color = activeColor;
+
+        const container = document.getElementById('tips-container');
+        const list = document.getElementById('tips-list');
+        list.innerHTML = "";
+        if (score < 5) {
+            container.classList.remove('hidden');
+            tips.forEach(t => { const li = document.createElement('li'); li.innerText = t; list.appendChild(li); });
+        } else { container.classList.add('hidden'); }
+    }
+
+    function formatTime(s) {
+        if (s < 1) return "Instant";
+        if (s < 60) return s.toFixed(1) + "s";
+        if (s < 86400) return (s / 3600).toFixed(1) + "h";
+        if (s < 31536000) return (s / 86400).toFixed(0) + " days";
+        const years = s / 31536000;
+        if (years < 1000) return Math.floor(years) + " years";
+        if (years < 1e6) return (years / 1000).toFixed(1) + "k years";
+        if (years < 1e9) return (years / 1e6).toFixed(1) + " Million years";
+        return (years / 1e9).toFixed(1) + " Billion years";
+    }
+
+    function toggleTheme() { document.body.classList.toggle('light-mode'); }
+
+    function resetUI() {
+        document.querySelectorAll('.segment').forEach(s => { s.style.background = 'var(--border)'; s.style.boxShadow = 'none'; });
+        document.getElementById('time-val').innerText = "0.00s";
+        document.getElementById('time-val').style.color = 'var(--primary)';
+        document.getElementById('risk-level').innerText = "READY TO SCAN";
+        document.getElementById('risk-level').style.color = 'var(--text)';
+        document.getElementById('scan-bar').style.width = "0%";
+        document.getElementById('tips-container').classList.add('hidden');
+        currentAccent = '#00f2ff';
+    }
+</script>
+</body>
+</html>
